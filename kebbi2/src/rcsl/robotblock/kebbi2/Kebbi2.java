@@ -26,12 +26,21 @@ import com.nuwarobotics.service.agent.VoiceResultJsonParser;
 
 import android.content.Context;
 import android.os.Handler;
+import android.os.Build;
 import android.util.Log;
 import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.List;
 
-public class Kebbi2 extends AndroidNonvisibleComponent implements RobotEventListener, VoiceEventListener, OnDestroyListener {
+import android.content.Intent;
+import android.content.ServiceConnection;
+import android.os.Bundle;
+import android.os.IBinder;
+import android.content.ComponentName;
+import android.os.RemoteException;
+
+public class Kebbi2 extends AndroidNonvisibleComponent implements RobotEventListener, VoiceEventListener, OnStopListener {
 
   private Context context;
   final Component thisComponent = this;
@@ -57,12 +66,19 @@ public class Kebbi2 extends AndroidNonvisibleComponent implements RobotEventList
   String stt_result = "";
   String speech_rate = "";
   String tts_sentence = "";
+  boolean isEnableOnStop = true;
+  boolean enableTracking = true;
+
+  ACamera2 aCamera2;
+  private FaceTrackInterface faceTrakingListener;
+
+  private ISwitchTrack mSwitchTrack;
 
   public Kebbi2(ComponentContainer container) {
     super(container.$form());
     context = container.$form();
 
-    form.registerForOnDestroy(this);
+    form.registerForOnStop(this);
     
     cmdTTS = new ArrayList<String>();
     cmdMotion = new ArrayList<String>();
@@ -70,6 +86,29 @@ public class Kebbi2 extends AndroidNonvisibleComponent implements RobotEventList
     newSingleThreadPool = Executors.newSingleThreadExecutor();
 
     InitialKebbi();
+
+    BindBackgroundService();
+    // aCamera2 = new ACamera2(container);
+    // ACamera2.faceTrackCallBack = this;    
+  }
+
+  public ServiceConnection serviceConnection = new ServiceConnection() {
+    @Override
+    public void onServiceConnected(ComponentName name, IBinder service) {
+        mSwitchTrack = ISwitchTrack.Stub.asInterface(service);
+    }
+
+    @Override
+    public void onServiceDisconnected(ComponentName name) {
+        mSwitchTrack = null;
+    }
+  };
+
+  public void BindBackgroundService(){
+    Intent intent = new Intent();
+    intent.setPackage("com.example.kebbifacetracking");
+    intent.setAction("com.example.kebbifacetracking.KCamera2");
+    boolean a = context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
   }
 
   @SimpleProperty(description = "String: Speech rate is on a scale of 1-9")
@@ -83,6 +122,102 @@ public class Kebbi2 extends AndroidNonvisibleComponent implements RobotEventList
       speech_rate = value.trim();
       mRobot.setSpeakParameter(VoiceEventListener.SpeakType.NORMAL, "speed", speech_rate); // 1~9
   }
+
+  @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_BOOLEAN, defaultValue = "True")
+  @SimpleProperty(description = "enable onStop lifecycle")
+  public void EnableOnStop(boolean value) {
+      isEnableOnStop = value;
+  }
+
+  int[] colorful = new int[4];
+  public int[] DecodeColor(int colors){
+    colorful[0] = (colors >> 24) & 0xff; // or color >>> 24  brightness
+    colorful[1] = (colors >> 16) & 0xff;  //R
+    colorful[2] = (colors >>  8) & 0xff;  //G
+    colorful[3] = (colors      ) & 0xff;  //B
+
+    return colorful;
+  }
+
+  @SimpleProperty(description = "")
+  public void TheWholeBodyGlowsIn(int colors) {
+      int[] color = DecodeColor(colors);
+
+      for(int i = 1; i <=4; i++ ){
+        mRobot.setLedColor(i, color[0], color[1], color[2], color[3]);
+        // turn on LED
+        mRobot.enableLed(i, 1);
+      }
+  }
+
+  @SimpleProperty(description = "")
+  public void HeadGlowsIn(int colors) {
+      int[] color = DecodeColor(colors);
+
+      mRobot.setLedColor(1, color[0], color[1], color[2], color[3]);
+      // // turn on LED
+      mRobot.enableLed(1, 1);
+  }
+
+  @SimpleProperty(description = "")
+  public void ChestGlowsIn(int colors) {
+      int[] color = DecodeColor(colors);
+
+      mRobot.setLedColor(2, color[0], color[1], color[2], color[3]);
+      // // turn on LED
+      mRobot.enableLed(2, 1);
+  }
+
+  @SimpleProperty(description = "")
+  public void LeftHandGlowsIn(int colors) {
+      int[] color = DecodeColor(colors);
+
+      mRobot.setLedColor(4, color[0], color[1], color[2], color[3]);
+      // // turn on LED
+      mRobot.enableLed(4, 1);
+  }
+
+  @SimpleProperty(description = "")
+  public void RightHandGlowsIn(int colors) {
+      int[] color = DecodeColor(colors);
+
+      mRobot.setLedColor(3, color[0], color[1], color[2], color[3]);
+
+      // // turn on LED
+      mRobot.enableLed(3, 1);
+  }
+
+  @SimpleFunction(description = "LED be controlled by App")
+  public void TheAppControlsLED(){
+     mRobot.disableSystemLED();
+  }
+
+  @SimpleFunction(description = "LED be controlled by Robot itself")
+  public void TheRobotControlsLED(){
+     mRobot.enableSystemLED();
+  }
+
+  // @SimpleFunction(description = "The unit of time is second")
+  // public void WaitFor(int seconds){
+  //   try{
+  //     int milliseconds = seconds * 1000;
+  //     Thread.sleep(milliseconds);
+  //   } catch (Exception e) {
+  //     e.printStackTrace();
+  //   }
+
+    // newSingleThreadPool.execute(new Runnable() {
+    //   @Override
+    //   public void run() {
+    //     try{
+    //       int milliseconds = seconds * 1000;
+    //       Thread.sleep(milliseconds);
+    //     } catch (Exception e) {
+    //       e.printStackTrace();
+    //     }
+    //   }
+    // });
+  // }
 
   @SimpleProperty(description = "Kebbi's head")
   public int Head() {
@@ -128,9 +263,9 @@ public class Kebbi2 extends AndroidNonvisibleComponent implements RobotEventList
     IClientId id = new IClientId("rcsl.robotblock.kebbi2");
     mRobot = new NuwaRobotAPI(context, id);
 
-    if(mRobot.isKiWiServiceReady()) mRobot.release();
+    // if(mRobot.isKiWiServiceReady()) mRobot.release();
 
-    if(newSingleThreadPool.isShutdown()) newSingleThreadPool = Executors.newSingleThreadExecutor();
+    // if(newSingleThreadPool.isShutdown()) newSingleThreadPool = Executors.newSingleThreadExecutor();
    
     mRobot.registerRobotEventListener(this);
     mRobot.registerVoiceEventListener(this);
@@ -138,10 +273,18 @@ public class Kebbi2 extends AndroidNonvisibleComponent implements RobotEventList
 
   @SimpleFunction(description = "Kebbi has 10 motors, you can control each of them")
   public void MotorControl(String sentence, int motorID, float positionInDegree, float speedInDegreePerSec) {
-    this.motorID = motorID;
-    this.positionInDegree = positionInDegree;
-    this.speedInDegreePerSec = speedInDegreePerSec;
-    DoTTSandAction(sentence, "custom_motion");
+    // this.motorID = motorID;
+    // this.positionInDegree = positionInDegree;
+    // this.speedInDegreePerSec = speedInDegreePerSec;
+    // DoTTSandAction(sentence, "custom_motion");
+
+    AsynchUtil.runAsynchronously(new Runnable() {
+      public void run() {
+        mRobot.ctlMotor(motorID, positionInDegree, speedInDegreePerSec);
+        mRobot.startTTS(sentence);
+        tts_sentence = sentence;
+      }
+    });
   }
 
   @SimpleFunction(description = "Kebbi motion reset")
@@ -151,12 +294,16 @@ public class Kebbi2 extends AndroidNonvisibleComponent implements RobotEventList
 
   @SimpleFunction(description = "Kebbi STT")
   public void StartSTT() {
-    try {
-        Thread.sleep(500);
-    } catch (InterruptedException e) {
-        e.printStackTrace();
-    }
-    mRobot.startSpeech2Text(false);
+    // try {
+    //     Thread.sleep(100);
+    // } catch (InterruptedException e) {
+    //     e.printStackTrace();
+    // }
+    AsynchUtil.runAsynchronously(new Runnable() {
+      public void run() {
+        mRobot.startSpeech2Text(false);
+      }
+    });
   }
 
   @SimpleFunction(description = "Kebbi speaks out a sentence by a giving string.")
@@ -181,14 +328,18 @@ public class Kebbi2 extends AndroidNonvisibleComponent implements RobotEventList
 
   @SimpleFunction(description = "Kebbi does TTS and action.")
   public void DoTTSandAction(String sentence, String motion) {
-    cmdTTS.add(sentence);
-    cmdMotion.add(motion);
+  //  mHandler.post(new Runnable() {
+  //     public void run() {
+        cmdTTS.add(sentence);
+        cmdMotion.add(motion);
 
-    if(doTTSnMotion) {
-      // mHandler.post(robotTTSandAction);
-      newSingleThreadPool.execute(robotTTSandAction);
-      doTTSnMotion = false;
-    }
+        if(doTTSnMotion) {
+          mHandler.post(robotTTSandAction);
+          // newSingleThreadPool.execute(robotTTSandAction);
+          doTTSnMotion = false;
+        }
+    //  }
+    // });
   }
 
   Runnable robotTTSandAction = new Runnable() {
@@ -203,12 +354,12 @@ public class Kebbi2 extends AndroidNonvisibleComponent implements RobotEventList
         tts_sentence = current_tts;
         //Start play tts and motion if need
         if(!current_tts.equals("")) mRobot.startTTS(current_tts);
-
+        if(!current_motion.equals("")) mRobot.motionPlay(current_motion, false);
         //Please NOTICE that auto_fadein should assign false when motion file nothing to display
-        if(current_motion.equals("custom_motion")){
-          mRobot.ctlMotor(motorID, positionInDegree, speedInDegreePerSec);
-          mMotion_complete = true;
-        }else if(!current_motion.equals("")) mRobot.motionPlay(current_motion, false);
+        // if(current_motion.equals("custom_motion")){
+        //   mRobot.ctlMotor(motorID, positionInDegree, speedInDegreePerSec);
+        //   mMotion_complete = true;
+        // }else if(!current_motion.equals("")) mRobot.motionPlay(current_motion, false);
 
         while(!mTts_complete || !mMotion_complete) {
             //wait both action complete
@@ -220,6 +371,7 @@ public class Kebbi2 extends AndroidNonvisibleComponent implements RobotEventList
             //both TTS and Motion complete, we play next action
             // mHandler.post(robotTTSandAction);//play next action
             newSingleThreadPool.execute(robotTTSandAction);
+            
         }else{
             TnMCmdStep = 0;
             doTTSnMotion = true;
@@ -238,8 +390,13 @@ public class Kebbi2 extends AndroidNonvisibleComponent implements RobotEventList
     AsynchUtil.runAsynchronously(new Runnable() {
       public void run() {
         if(mRobot.isKiWiServiceReady()) {
-          newSingleThreadPool.shutdown();
+          // newSingleThreadPool.shutdown();
           mRobot.release();
+          if(Build.VERSION.SDK_INT>=16 && Build.VERSION.SDK_INT<21){
+            form.finishAffinity();
+          } else if(Build.VERSION.SDK_INT>=21){
+            form.finishAndRemoveTask();
+          }
         }
       }
     });
@@ -263,7 +420,11 @@ public class Kebbi2 extends AndroidNonvisibleComponent implements RobotEventList
   }
 
   public void onStartOfMotionPlay(String s) {
-
+    try {
+      mSwitchTrack.disableTrack();
+    } catch (RemoteException e) {
+        e.printStackTrace();
+    }
   }
 
   public void onPauseOfMotionPlay(String s) {
@@ -283,6 +444,12 @@ public class Kebbi2 extends AndroidNonvisibleComponent implements RobotEventList
         EventDispatcher.dispatchEvent(thisComponent, "onCompleteOfMotionPlay", s);
       }
     });    
+
+    try {
+        mSwitchTrack.enableTrack();
+    } catch (RemoteException e) {
+        e.printStackTrace();
+    }
   }
 
   public void onPlayBackOfMotionPlay(String s) {
@@ -316,6 +483,11 @@ public class Kebbi2 extends AndroidNonvisibleComponent implements RobotEventList
         EventDispatcher.dispatchEvent(thisComponent, "onPIREvent", i);
       }
     });
+  }
+
+  @SimpleFunction(description = "call onTap event")
+  public void EventOnTap(int bodypart) {
+    onTap(bodypart);
   }
 
   @SimpleEvent(description = "tap event")
@@ -389,7 +561,7 @@ public class Kebbi2 extends AndroidNonvisibleComponent implements RobotEventList
 
   // @SimpleEvent()
   public void onSpeech2TextComplete(boolean b, String s) {
-    Log.d("nSpeech2TextCompletedddd","wait both action complete");
+    Log.d("nSpeech2TextCompleted", "wait both action complete");
     stt_result = VoiceResultJsonParser.parseVoiceResult(s);
     STTCompleted(b, s, stt_result);    
   }
@@ -427,9 +599,24 @@ public class Kebbi2 extends AndroidNonvisibleComponent implements RobotEventList
 
   }
 
-  @Override
-  public void onDestroy() {
-    newSingleThreadPool.shutdown();
-    mRobot.release();
+  public void onStop() {
+    if(isEnableOnStop){
+      // newSingleThreadPool.shutdown();
+
+      mRobot.stopTTS();
+      mRobot.stopTTSandRecognize();
+      cmdMotion.clear();
+      cmdTTS.clear();    
+
+      mRobot.release();
+      Log.d("onStop","release");
+      if(Build.VERSION.SDK_INT>=16 && Build.VERSION.SDK_INT<21){
+        form.finishAffinity();
+        Log.d("onStop","finishAffinity");
+      } else if(Build.VERSION.SDK_INT>=21){
+        form.finishAndRemoveTask();
+        Log.d("onStop","finishAndRemoveTask");
+      }
+    }
   }
 }

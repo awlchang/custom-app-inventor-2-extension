@@ -6,7 +6,7 @@ description: Extension component for Kebbi2. Created using Rush.
 
 version:
   number: auto        # Auto increments version number when built with '-r' (or '--release') flag.
-  name: 0.1
+  name: '0.1'
 
 assets:
   icon: logo.png      # Extension icon
@@ -23,4 +23,3 @@ release:
 
 deps:         # Dependencies should be first added to the "deps" folder
   - NuwaSDK-2020-09-23_0949_2.1.0.04_a77ee1.jar
-
