@@ -18,8 +18,9 @@ authors:
 
 # Uncomment the below field if you wish to apply ProGuard while building a release
 # build ('-r') of your extension:
-release:
-  optimize: true
+build:
+  release:
+    optimize: true
 
 deps:         # Dependencies should be first added to the "deps" folder
-  - NuwaSDK-2020-09-23_0949_2.1.0.04_a77ee1.jar
+  - NuwaSDK-AIR.jar
