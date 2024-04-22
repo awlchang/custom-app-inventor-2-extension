@@ -289,7 +289,7 @@ public class Kebbi2 extends AndroidNonvisibleComponent implements IRobotEventCal
   // }
 
   @SimpleFunction(description = "Kebbi has 10 motors, you can control each of them")
-  public void MotorControl(String sentence, int motorID, float positionInDegree, float speedInDegreePerSec) {
+  public void MotorControl(int motorID, float positionInDegree, float speedInDegreePerSec) {
     // this.motorID = motorID;
     // this.positionInDegree = positionInDegree;
     // this.speedInDegreePerSec = speedInDegreePerSec;
@@ -298,10 +298,10 @@ public class Kebbi2 extends AndroidNonvisibleComponent implements IRobotEventCal
 
     mRobot.ctlMotor(motorID, positionInDegree, speedInDegreePerSec);
 
-    if(sentence != ""){
-      mRobot.startTTS(sentence);
-      VoiceEvent.tts_sentence = sentence;
-    }
+    // if(sentence != ""){
+    //   mRobot.startTTS(sentence);
+    //   VoiceEvent.tts_sentence = sentence;
+    // }
   }
 
   @SimpleFunction(description = "Kebbi has 10 motors, you can control each of them")
